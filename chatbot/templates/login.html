@@ -1,0 +1,14 @@
+<h1>Appollo Hospital Chatbot</h1>
+<h3>Login Page</h3>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <label for="username">Username :</label><br>
+    <input type="text" id="username" name="username" required><br><br>
+    <label for="password">Password :</label><br>
+    <input type="password" id="password", name="password"><br><br>
+    <button type="submit">Login</button>
+</form>
+<a>{{ error }}</a>
+
+<a href="{% url 'signup' %}" class="button">Signup</a>

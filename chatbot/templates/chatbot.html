@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .chatbox {
+            width: 400px;
+            margin: 50px auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+        }
+        .chatbox h2 {
+            text-align: center;
+        }
+        .messages {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: white;
+            border-radius: 5px;
+        }
+        .input-container {
+            display: flex;
+            justify-content: space-between;
+        }
+        .input-container input {
+            width: 80%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .input-container button {
+            width: 15%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h2><p>{{ message }} what can i help with</p></h2>
+    </div>
+    <div class="chatbox">
+        <h2>Simple Chatbot</h2>
+        <div class="messages" id="messages"></div>
+        <div class="input-container">
+            <input type="text" id="userMessage" placeholder="Type a message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+        
+    </div>
+    <a href="{% url 'login' %}" class="button">Login</a>
+    <a href="{% url 'logout' %}" class="button">Logout</a>
+
+    <script>
+        function getCSRFToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith('csrftoken=')) {
+                    return cookie.substring('csrftoken='.length, cookie.length);
+                }
+            }
+            return '';
+        }
+
+        function sendMessage() {
+            const userMessage = document.getElementById('userMessage').value;
+            if (userMessage) {
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML += `<p><b>You:</b> ${userMessage}</p>`;
+                document.getElementById('userMessage').value = '';
+
+                fetch('/chat/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': getCSRFToken() // Adding CSRF token from cookies
+                    },
+                    body: JSON.stringify({ message: userMessage })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    messagesDiv.innerHTML += `<p><b>Bot:</b> ${data.response}</p>`;
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+    </script>
+</body>
+</html>
