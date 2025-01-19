@@ -1,0 +1,6 @@
+,id,user_id,session_id,user_input,generated_response,response_time,chat_session_start_timestamp,chat_session_title,chat_session_end_timestamp,has_interaction,is_active,response_feedback
+0,1,2,7e2135af-a226-498d-a16c-a34ef17520c8,,,,2024-12-18 16:32:00.607448+00:00,,2024-12-18 16:32:00.607448+00:00,False,True,
+1,2,2,da4f8c7f-f2f5-4857-8363-cd812ac9058a,,,,2024-12-18 16:33:07.439110+00:00,,2024-12-18 16:33:07.439110+00:00,False,True,
+2,3,2,d7caf811-50d5-46fd-9f1c-a9d40b157148,,,,2024-12-18 16:34:21.806445+00:00,super111_d7caf811-50d5-46fd-9f1c-a9d40b157148,2024-12-18 16:34:21.806445+00:00,False,True,
+3,4,2,a7922e49-3799-431c-9023-07a70322abb2,,,,2024-12-18 16:35:24.739599+00:00,super111_a7922e49-3799-431c-9023-07a70322abb2,2024-12-18 16:35:24.739599+00:00,False,True,
+4,5,2,3cd3da30-ed34-47ae-a3e3-d6059b1dd3c3,hy how are you,"Hello! I'm doing well, thank you for asking. I'm Sona, your friendly chatbot from Apollo Adlux Hospital, and I'm here to help answer any questions or concerns you may have about your health or our hospital services. How can I assist you today?",0 days 00:00:17.328066,2024-12-18 16:35:42.067665+00:00,,2024-12-18 16:35:42.067665+00:00,True,True,

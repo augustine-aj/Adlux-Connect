@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Adlux Connect</title>
+    
+    {% load static %}
+    {% csrf_token %}
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{% static 'index2.css' %}">
+    <link rel="stylesheet" href="../static/index2.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Fonts Link -->
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+</head>
+
+<body class="light-mode">
+    <!-- Chats container -->
+    <section class="sidebar-section">
+        <div class="sidebar">
+            <button class="toggle-btn" onclick="toggleSidebar()">⮜</button>
+            
+            <!--
+            <a href="{% url 'login' %}" class="button">Login</a>
+            <a href="{% url 'logout' %}" class="button">Logout</a>
+            <button class="login-logout-btn" href="{% url 'login' %}">Login</button>
+            <button class="login-logout-btn" href="{% url 'logout' %}">Logout</button>
+            -->
+
+            <ul class="menu fixed">
+                <li><a href="{% url 'logout' %}"><i class="fa-solid fa-house"></i><span>Logout</span></a></li>
+            </ul>
+            <button  id="new-chat-btn">+ New chat</button>
+            <ul class="menu dynamic"></ul>
+
+        </div>
+    </section>
+
+    <div class="chat-container"></div>
+      
+        <!-- Typing container -->
+    <div class="typing-container">
+        <div class="typing-content">
+            <div class="typing-textarea">
+                <textarea id="chat-input" spellcheck="false" placeholder="Enter a prompt here" required></textarea>
+                <span id="send-btn" class="material-symbols-rounded">send</span>
+            </div>
+            <div class="typing-controls">
+                    <span id="theme-btn" class="material-symbols-rounded">light_mode</span>
+                    <span id="delete-btn" class="material-symbols-rounded">delete</span>
+            </div>
+        </div>
+    </div>
+    <!-- JavaScript -->
+
+    <script id="interaction-data" type="application/json">
+    </script>
+    <script>
+        const chatInput = document.querySelector("#chat-input");
+        const sendButton = document.querySelector("#send-btn");
+        const chatContainer = document.querySelector(".chat-container");
+        const themeButton = document.querySelector("#theme-btn");
+        const deleteButton = document.querySelector("#delete-btn");
+        const newChatButton = document.querySelector("#new-chat-btn");
+        const initialInputHeight = chatInput.scrollHeight;
+        var interactionList = JSON.parse('{{ interactions|escapejs }}');
+
+        let userText = null;
+    
+        console.log('loaded..');
+
+        newChatButton.addEventListener("click", function() {
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            fetch("new_chat", {
+                method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken,  // Send CSRF token
+                    },
+                    body: JSON.stringify({}) // Optional data, if needed in request body
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.status);  // Shows 'success' in the console
+                location.reload();  // Reloads the page
+            })
+            .catch(error => {
+                console.error("Error fetching data:", error);
+            });
+        });
+
+        function handleMenuItemClick(dataItem) {
+            // console.log("Clicked item:", dataItem);
+
+            fetch('get_chat_history', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken(), // Add CSRF token for security
+                },
+                body: JSON.stringify({ data: dataItem }) // Pass the clicked data to the backend
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Response from backend:", data);
+
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url; // Navigate to the new view
+                } else if (data.status === 'success') {
+                    // Check if interactions exist and log it
+                    if (data.interactions) {
+                        chatContainer.innerHTML ='';
+                        // console.log("Interactions:", data.interactions);
+                        interactions = JSON.parse(data.interactions)
+                        interactions.forEach(interaction => {
+                            // console.log("User Message:", interaction.user_message);
+                            // console.log("Bot Response:", interaction.bot_response);
+
+                            const html = `
+                            <div class="chat-content">
+                                <div class="chat-details">
+                                    <p>${interaction.user_message}</p>
+                                </div>
+                            </div>`;
+
+                        // Assuming createChatElement returns a new HTML element
+                        const outgoingChatDiv = createChatElement(html, "outgoing");
+
+                        // Remove the default text, if it exists
+                        chatContainer.querySelector(".default-text")?.remove();
+
+                        // Append the new chat div to the container
+                        chatContainer.appendChild(outgoingChatDiv);
+
+                        // Scroll to the bottom of the chat container
+                        chatContainer.scrollTo(0, chatContainer.scrollHeight);
+                        showBotResponse(interaction.bot_response)
+                    
+                        // loadDataFromLocalstorage();   --> uncomment this for debug purpose
+                        sendButton.addEventListener("click", handleOutgoingChat);
+                        });
+                    } else {
+                        console.error("No interactions found. i dont know why");
+                    }
+                } else {
+                    console.error("Action failed:", data.message);
+                }
+            })
+            .catch(error => console.error("Error handling menu item click:", error));
+        }
+
+        function updateSidebarMenu(dummyData) {
+            const sidebarMenu = document.querySelector('.sidebar .menu.dynamic');
+            
+            // Ensure sidebar items are cleared and updated with fetched data
+            sidebarMenu.innerHTML = '';  // Clear existing menu items
+
+            // Populate the sidebar with the fetched dummy data
+            dummyData.forEach(item => {
+                const listItem = document.createElement('li');
+                const anchor = document.createElement('a');
+                anchor.href = '#';
+                anchor.textContent = item;  // Set text to each data item
+                listItem.appendChild(anchor);
+                sidebarMenu.appendChild(listItem);
+
+                anchor.addEventListener('click', () => {
+                handleMenuItemClick(item); // Send item to the backend when clicked
+        });
+            });
+        }
+
+        function fetchSidebarData() {
+            console.log('Fetching sidebar data...');
+
+            // Use a GET request to fetch data when the sidebar is open
+            fetch('fetch_sidebar_data', {
+                method: 'GET',  // Use GET for fetching dummy data
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),  // Add CSRF token for security
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.dummyData) {
+                    updateSidebarMenu(data.dummyData);
+                } else {
+                    console.error("No data received");
+                }
+            })
+            .catch(error => console.error("Error fetching data: ", error));
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const toggleBtn = document.querySelector('.toggle-btn');
+
+            sidebar.classList.toggle('collapsed');  // Toggling the sidebar class
+    
+            // Update the toggle button arrow direction
+            if (sidebar.classList.contains('collapsed')) {
+                toggleBtn.innerHTML = '⮞'; // Point right when closed
+            } else {
+                toggleBtn.innerHTML = '⮜'; // Point left when open
+
+                // Fetch  data when the sidebar is opened
+                fetchSidebarData();
+            }
+            
+            // Ensure the sidebar items are hidden when collapsed
+            const sidebarMenu = sidebar.querySelector('.menu');
+            sidebarMenu.style.display = sidebar.classList.contains('collapsed') ? 'none' : 'block';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check the initial state of the sidebar on page load
+            const sidebar = document.querySelector('.sidebar');
+            const sidebarMenu = sidebar.querySelector('.menu');
+
+            // If sidebar is already open, fetch and display data
+            if (!sidebar.classList.contains('collapsed')) {
+                fetchSidebarData();
+            } else {
+                sidebarMenu.style.display = 'none';  // Hide the menu items when collapsed
+            }
+        });
+
+        const loadDataFromLocalstorage = () => {
+            // Load saved chats and theme from local storage and apply/add on the page
+            const themeColor = localStorage.getItem("themeColor");
+            document.body.classList.toggle("light-mode", themeColor === "light_mode");
+            themeButton.innerText = document.body.classList.contains("light-mode") ? "dark_mode" : "light_mode";
+    
+            const defaultText = `<div class="default-text" style="background-image: url('images/us.jpg'); background-size: cover; background-repeat: no-repeat;">
+                                    <h1>Apollo Adlux Chatbot</h1>
+                                    <h2>Hy {{user}} What can I help with?<br></h2>
+                                </div>`;
+    
+            chatContainer.innerHTML = localStorage.getItem("all-chats") || defaultText;
+            chatContainer.scrollTo(0, chatContainer.scrollHeight); // Scroll to bottom of the chat container
+        };
+    
+        function getCSRFToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith('csrftoken=')) {
+                    return cookie.substring('csrftoken='.length, cookie.length);
+                }
+            }
+            return '';
+        }
+    
+        const createChatElement = (content, ...classNames) => {
+            // Create new div and apply multiple class names by spreading classNames
+            const chatDiv = document.createElement("div");
+            chatDiv.classList.add("chat", ...classNames); // Spread classNames into individual tokens
+            chatDiv.innerHTML = content;
+            return chatDiv; // Return the created chat div
+        };                                                                                  
+    
+        const showBotResponse = (responseText) => {
+            const html = `<div class="chat-content">
+                            <div class="chat-details">
+                                <img src="images/chatbot.jpg" alt="chatbot-img">
+                                <p>${responseText}</p>
+                            </div>
+                            <span onclick="copyResponse(this)" class="material-symbols-rounded">content_copy</span>
+                        </div>`;
+            const botResponseDiv = createChatElement(html, "incoming");
+            chatContainer.appendChild(botResponseDiv);
+            chatContainer.scrollTo(0, chatContainer.scrollHeight);
+        };
+    
+        const showTypingAnimation = () => {
+            // Display the typing animation and call the getChatResponse function
+            const html = `<div class="chat-content">
+                            <div class="chat-details">
+                                <img src="images/chatbot.jpg" alt="chatbot-img">
+                                <div class="typing-animation">
+                                    <div class="typing-dot" style="--delay: 0.2s"></div>
+                                    <div class="typing-dot" style="--delay: 0.3s"></div>
+                                    <div class="typing-dot" style="--delay: 0.4s"></div>
+                                </div>
+                            <span onclick="copyResponse(this)" class="material-symbols-rounded">content_copy</span>
+                            </div>
+                        </div>`;
+            // Create an incoming chat div with typing animation
+            const incomingChatDiv = createChatElement(html, "incoming", "typing");
+            chatContainer.appendChild(incomingChatDiv);
+            chatContainer.scrollTo(0, chatContainer.scrollHeight);
+        };
+    
+        const handleOutgoingChat = () => {
+            userText = chatInput.value.trim(); 
+            if (!userText) return;
+    
+            const html = `<div class="chat-content" >
+                            <div class="chat-details">
+                                <img src="images/user.jpg" alt="user-img">
+                                <p>${userText}</p>
+                            </div>
+                        </div>`;
+            const outgoingChatDiv = createChatElement(html, "outgoing");
+            chatContainer.querySelector(".default-text")?.remove();
+            chatContainer.appendChild(outgoingChatDiv);
+            chatContainer.scrollTo(0, chatContainer.scrollHeight);
+    
+            chatInput.value = ""; 
+            chatInput.style.height = `${initialInputHeight}px`;
+    
+            showTypingAnimation(); 
+    
+            sendMessage(userText);
+        };
+    
+        const sendMessage = (message) => {
+            console.log('requesting to server....0');
+            // Simulate typing animation by removing it after some time
+            const typingDiv = document.querySelector(".typing");
+    
+            fetch('/chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken() // Adding CSRF token from cookies
+                },
+                body: JSON.stringify({ message })
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    // Remove typing animation
+                    typingDiv?.remove();
+    
+                    // Show the bot's response
+                    showBotResponse(data.response);
+                })
+                .catch(error => {
+                    typingDiv?.remove();
+                    console.error('Error:', error);
+                    showBotResponse("Sorry, something went wrong. Please try again.");
+                });
+        };
+    
+        deleteButton.addEventListener("click", () => {
+            if (confirm("Are you sure you want to delete all the chats?")) {
+                localStorage.removeItem("all-chats");
+                loadDataFromLocalstorage();
+            }
+        });
+    
+        themeButton.addEventListener("click", () => {
+            document.body.classList.toggle("light-mode");
+            localStorage.setItem("themeColor", themeButton.innerText);
+            themeButton.innerText = document.body.classList.contains("light-mode") ? "dark_mode" : "light_mode";
+        });
+    
+        chatInput.addEventListener("input", () => {
+            chatInput.style.height = `${initialInputHeight}px`;
+            chatInput.style.height = `${chatInput.scrollHeight}px`;
+        });
+    
+        chatInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 800) {
+                e.preventDefault();
+                handleOutgoingChat();
+            }
+        });
+
+        // Check if interactionList has any data
+        if (interactionList.length > 0) {
+            // Loop through each interaction and render chat messages
+            interactionList.forEach(interaction => {
+                console.log(interaction.user_message); // This should now print user_message in the console
+
+                const html = `
+                    <div class="chat-content">
+                        <div class="chat-details">
+                            <p>${interaction.user_message}</p>
+                        </div>
+                    </div>`;
+
+                // Assuming createChatElement returns a new HTML element
+                const outgoingChatDiv = createChatElement(html, "outgoing");
+
+                // Remove the default text, if it exists
+                chatContainer.querySelector(".default-text")?.remove();
+
+                // Append the new chat div to the container
+                chatContainer.appendChild(outgoingChatDiv);
+
+                // Scroll to the bottom of the chat container
+                chatContainer.scrollTo(0, chatContainer.scrollHeight);
+                showBotResponse(interaction.bot_response)
+            });
+            
+            // loadDataFromLocalstorage();   --> uncomment this for debug purpose
+            sendButton.addEventListener("click", handleOutgoingChat);
+        }else{
+            loadDataFromLocalstorage();
+            sendButton.addEventListener("click", handleOutgoingChat);
+        }
+    </script>    
+</body>
+</html>
